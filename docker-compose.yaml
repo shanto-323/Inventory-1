@@ -1,0 +1,27 @@
+services:
+  elastic:
+    image: elastic/elasticsearch:9.0.2
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node # SINGLE NODE
+      - xpack.security.enabled=false # AUTH OFF
+    ports:
+      - 9200:9200
+    restart: unless-stopped
+
+  inventory:
+    build:
+      context: .
+      dockerfile: ./app.dockerfile
+    env_file:
+      - .env
+    depends_on:
+      - elastic
+    ports:
+      - 8080:8080
+    restart: on-failure
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        window: 10s

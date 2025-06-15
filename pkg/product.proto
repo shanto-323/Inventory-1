@@ -1,0 +1,18 @@
+syntax = "proto3";
+package pb;
+option go_package = "./pb";
+import "google/protobuf/timestamp.proto";
+
+message Product {
+  string id = 1;
+  string type = 2;
+  string brand = 3;
+  string name = 4;
+  string model = 5;
+  int64 stock = 6;
+  map<string, string> specs = 7;
+  string warranty = 8;
+  string supplier = 9;
+  google.protobuf.Timestamp date_added = 10;
+  string note = 11;
+}
