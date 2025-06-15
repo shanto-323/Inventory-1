@@ -1,9 +1,7 @@
 package storage
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"inventory/pkg/pb"
@@ -13,11 +11,11 @@ import (
 )
 
 type Service interface {
-	CreateProduct(
-		ctx context.Context,
-		product *pb.Product,
-	) (*pb.Product, error)
+	CreateProduct(ctx context.Context, product *pb.Product) (*pb.Product, error)
 	GetProductById(ctx context.Context, productId string) (*pb.Product, error)
+	GetAllProducts(ctx context.Context) ([]*pb.Product, error)
+	UpdateProduct(ctx context.Context, product *pb.Product) (*pb.Product, error)
+	DeleteProduct(ctx context.Context, productId string) error
 }
 
 type productService struct {
@@ -28,19 +26,12 @@ func NewService(repo Repository) Service {
 	return &productService{repo: repo}
 }
 
-func (s *productService) CreateProduct(
-	ctx context.Context,
-	product *pb.Product,
-) (*pb.Product, error) {
+func (s *productService) CreateProduct(ctx context.Context, product *pb.Product) (*pb.Product, error) {
 	Id := uuid.New().String()
 	product.Id = Id
 	product.DateAdded = timestamppb.Now()
 
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(product); err != nil {
-		return nil, returnServiceString(err)
-	}
-	if err := s.repo.Create(ctx, buf, Id); err != nil {
+	if err := s.repo.Upsert(ctx, product, Id); err != nil {
 		return nil, returnServiceString(err)
 	}
 
@@ -48,12 +39,80 @@ func (s *productService) CreateProduct(
 }
 
 func (s *productService) GetProductById(ctx context.Context, productId string) (*pb.Product, error) {
-	resp, err := s.repo.GetProduct(ctx, productId)
+	resp, err := s.repo.Product(ctx, productId)
 	if err != nil {
 		return nil, returnServiceString(err)
 	}
 
 	return resp, nil
+}
+
+func (s *productService) GetAllProducts(ctx context.Context) ([]*pb.Product, error) {
+	resp, err := s.repo.Products(ctx)
+	if err != nil {
+		return nil, returnServiceString(err)
+	}
+
+	return resp, nil
+}
+
+func (s *productService) UpdateProduct(ctx context.Context, product *pb.Product) (*pb.Product, error) {
+	resp, err := s.GetProductById(ctx, product.Id)
+	if err != nil {
+		return nil, returnServiceString(err)
+	}
+	mutationHelper(resp, product)
+
+	err = s.repo.Upsert(ctx, resp, resp.Id)
+	if err != nil {
+		return nil, returnServiceString(err)
+	}
+	return resp, nil
+}
+
+func (s *productService) DeleteProduct(ctx context.Context, productId string) error {
+	return s.repo.Delete(ctx, productId)
+}
+
+func mutationHelper(dbData *pb.Product, product *pb.Product) {
+	if product.Type != "" {
+		dbData.Type = product.Type
+	}
+	if product.Brand != "" {
+		dbData.Brand = product.Brand
+	}
+	if product.Name != "" {
+		dbData.Name = product.Name
+	}
+	if product.Model != "" {
+		dbData.Model = product.Model
+	}
+	if product.Stock != 0 {
+		dbData.Stock = product.Stock
+	}
+	if product.Warranty != "" {
+		dbData.Warranty = product.Warranty
+	}
+	if product.Supplier != "" {
+		dbData.Supplier = product.Supplier
+	}
+	if product.DateAdded != nil {
+		dbData.DateAdded = product.DateAdded
+	}
+	if product.Note != "" {
+		dbData.Note = product.Note
+	}
+
+	if product.Specs != nil {
+		if dbData.Specs == nil {
+			dbData.Specs = make(map[string]string)
+		}
+		for k, v := range product.Specs {
+			if v != "" {
+				dbData.Specs[k] = v
+			}
+		}
+	}
 }
 
 func returnServiceString(m any) error {

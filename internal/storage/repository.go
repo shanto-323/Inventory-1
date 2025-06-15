@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"inventory/pkg/pb"
 
@@ -12,8 +13,10 @@ import (
 )
 
 type Repository interface {
-	Create(ctx context.Context, product bytes.Buffer, productId string) error
-	GetProduct(ctx context.Context, productId string) (*pb.Product, error)
+	Upsert(ctx context.Context, product *pb.Product, productId string) error
+	Product(ctx context.Context, productId string) (*pb.Product, error)
+	Products(ctx context.Context) ([]*pb.Product, error)
+	Delete(ctx context.Context, productId string) error
 }
 
 type inventoryRepository struct {
@@ -42,17 +45,47 @@ type document struct {
 	Source pb.Product `json:"_source"`
 }
 
+type allDocument struct {
+	Hits struct {
+		Total struct {
+			Value int `json:"value"`
+		} `json:"total"`
+		Hits []document `json:"hits"`
+	} `json:"hits"`
+}
+
 const (
 	INVENTORY_INDEX = "inventroy"
 )
 
-func (r *inventoryRepository) Create(ctx context.Context, product bytes.Buffer, productId string) error {
-	_, err := r.client.Index(
+func (r *inventoryRepository) Upsert(ctx context.Context, product *pb.Product, productId string) error {
+	doc := map[string]interface{}{
+		"doc": map[string]interface{}{
+			"type":       product.GetType(),
+			"brand":      product.GetBrand(),
+			"name":       product.GetName(),
+			"model":      product.GetModel(),
+			"stock":      product.GetStock(),
+			"specs":      product.GetSpecs(),
+			"warranty":   product.GetWarranty(),
+			"supplier":   product.GetSupplier(),
+			"date_added": product.GetDateAdded(),
+			"note":       product.GetNote(),
+		},
+		"doc_as_upsert": true,
+	}
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(doc); err != nil {
+		return fmt.Errorf("json encode error: %w", err)
+	}
+
+	_, err := r.client.Update(
 		INVENTORY_INDEX,
-		&product,
-		r.client.Index.WithContext(ctx),
-		r.client.Index.WithDocumentID(productId),
-		r.client.Index.WithRefresh("true"),
+		productId,
+		&buf,
+		r.client.Update.WithContext(ctx),
+		r.client.Update.WithRefresh("true"),
 	)
 	if err != nil {
 		return returnString(err)
@@ -60,7 +93,7 @@ func (r *inventoryRepository) Create(ctx context.Context, product bytes.Buffer, 
 	return nil
 }
 
-func (r *inventoryRepository) GetProduct(ctx context.Context, productId string) (*pb.Product, error) {
+func (r *inventoryRepository) Product(ctx context.Context, productId string) (*pb.Product, error) {
 	resp, err := r.client.Get(
 		INVENTORY_INDEX,
 		productId,
@@ -81,7 +114,55 @@ func (r *inventoryRepository) GetProduct(ctx context.Context, productId string) 
 		return nil, returnString(err)
 	}
 
+	document.Source.Id = document.Id
 	return &document.Source, nil
+}
+
+func (r *inventoryRepository) Products(ctx context.Context) ([]*pb.Product, error) {
+	stringQuery := `{
+		"query": {
+			"match_all": {}
+		}
+	}`
+
+	resp, err := r.client.Search(
+		r.client.Search.WithContext(ctx),
+		r.client.Search.WithIndex(INVENTORY_INDEX),
+		r.client.Search.WithBody(strings.NewReader(stringQuery)),
+	)
+	if err != nil {
+		return nil, returnString(err)
+	}
+	if resp.IsError() {
+		return nil, returnString("field is empty")
+	}
+
+	var allDocument allDocument
+	if err := json.NewDecoder(resp.Body).Decode(&allDocument); err != nil {
+		return nil, returnString(err)
+	}
+
+	var products []*pb.Product
+	for i := range allDocument.Hits.Hits {
+		product := &allDocument.Hits.Hits[i].Source
+		product.Id = allDocument.Hits.Hits[i].Id
+		products = append(products, product)
+	}
+
+	return products, nil
+}
+
+func (r *inventoryRepository) Delete(ctx context.Context, productId string) error {
+	_, err := r.client.Delete(
+		INVENTORY_INDEX,
+		productId,
+		r.client.Delete.WithContext(ctx),
+		r.client.Delete.WithRefresh("true"),
+	)
+	if err != nil {
+		return returnString(err)
+	}
+	return nil
 }
 
 func returnString(m any) error {
