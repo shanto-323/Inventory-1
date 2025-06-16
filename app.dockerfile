@@ -11,4 +11,5 @@ RUN go build -o /cmd/app ./cmd
 FROM alpine:3.20
 WORKDIR /usr/bin
 COPY --from=build /cmd/app .
+COPY cert.pem key.pem ./
 CMD [ "app" ]

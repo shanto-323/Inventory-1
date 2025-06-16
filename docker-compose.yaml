@@ -13,6 +13,9 @@ services:
     build:
       context: .
       dockerfile: ./app.dockerfile
+    volumes:
+      - ./cert.pem:/app/cert.pem
+      - ./key.pem:/app/key.pem
     env_file:
       - .env
     depends_on:

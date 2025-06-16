@@ -30,6 +30,9 @@ func (s *Server) Start() error {
 	productController := controller.NewProductController(router, s.service)
 	productController.StartProductControoler()
 
+	analyticsController := controller.NewAnalyticsController(router, s.service)
+	analyticsController.StartAnalyticsControoler()
+
 	fmt.Printf("server running on port %s....\n", s.ipAddr)
-	return http.ListenAndServe(s.ipAddr, mux)
+	return http.ListenAndServeTLS(s.ipAddr, "cert.pem", "key.pem", mux)
 }

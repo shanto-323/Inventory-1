@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"inventory/pkg/pb"
 
@@ -16,6 +17,9 @@ type Service interface {
 	GetAllProducts(ctx context.Context) ([]*pb.Product, error)
 	UpdateProduct(ctx context.Context, product *pb.Product) (*pb.Product, error)
 	DeleteProduct(ctx context.Context, productId string) error
+
+	// Analytics
+	FindMinStock(ctx context.Context, levelString string) ([]*pb.Product, error)
 }
 
 type productService struct {
@@ -72,6 +76,14 @@ func (s *productService) UpdateProduct(ctx context.Context, product *pb.Product)
 
 func (s *productService) DeleteProduct(ctx context.Context, productId string) error {
 	return s.repo.Delete(ctx, productId)
+}
+
+func (s *productService) FindMinStock(ctx context.Context, levelString string) ([]*pb.Product, error) {
+	level, err := strconv.ParseInt(levelString, 10, 64)
+	if err != nil {
+		return nil, returnServiceString(err)
+	}
+	return s.repo.MinStock(ctx, int(level))
 }
 
 func mutationHelper(dbData *pb.Product, product *pb.Product) {

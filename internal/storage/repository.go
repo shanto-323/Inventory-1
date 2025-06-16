@@ -17,6 +17,9 @@ type Repository interface {
 	Product(ctx context.Context, productId string) (*pb.Product, error)
 	Products(ctx context.Context) ([]*pb.Product, error)
 	Delete(ctx context.Context, productId string) error
+
+	// Analytics
+	MinStock(ctx context.Context, level int) ([]*pb.Product, error)
 }
 
 type inventoryRepository struct {
@@ -93,6 +96,19 @@ func (r *inventoryRepository) Upsert(ctx context.Context, product *pb.Product, p
 	return nil
 }
 
+func (r *inventoryRepository) Delete(ctx context.Context, productId string) error {
+	_, err := r.client.Delete(
+		INVENTORY_INDEX,
+		productId,
+		r.client.Delete.WithContext(ctx),
+		r.client.Delete.WithRefresh("true"),
+	)
+	if err != nil {
+		return returnString(err)
+	}
+	return nil
+}
+
 func (r *inventoryRepository) Product(ctx context.Context, productId string) (*pb.Product, error) {
 	resp, err := r.client.Get(
 		INVENTORY_INDEX,
@@ -125,10 +141,29 @@ func (r *inventoryRepository) Products(ctx context.Context) ([]*pb.Product, erro
 		}
 	}`
 
+	return r.searchResult(ctx, stringQuery)
+}
+
+// Analytics
+func (r *inventoryRepository) MinStock(ctx context.Context, level int) ([]*pb.Product, error) {
+	stringQuery := fmt.Sprintf(`{
+		"query": {
+			"range": {
+				"stock": {
+					"lte" : %d
+				}
+			}
+		}
+	}`, level)
+
+	return r.searchResult(ctx, stringQuery)
+}
+
+func (r *inventoryRepository) searchResult(ctx context.Context, query string) ([]*pb.Product, error) {
 	resp, err := r.client.Search(
 		r.client.Search.WithContext(ctx),
 		r.client.Search.WithIndex(INVENTORY_INDEX),
-		r.client.Search.WithBody(strings.NewReader(stringQuery)),
+		r.client.Search.WithBody(strings.NewReader(query)),
 	)
 	if err != nil {
 		return nil, returnString(err)
@@ -150,19 +185,6 @@ func (r *inventoryRepository) Products(ctx context.Context) ([]*pb.Product, erro
 	}
 
 	return products, nil
-}
-
-func (r *inventoryRepository) Delete(ctx context.Context, productId string) error {
-	_, err := r.client.Delete(
-		INVENTORY_INDEX,
-		productId,
-		r.client.Delete.WithContext(ctx),
-		r.client.Delete.WithRefresh("true"),
-	)
-	if err != nil {
-		return returnString(err)
-	}
-	return nil
 }
 
 func returnString(m any) error {
