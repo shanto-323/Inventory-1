@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"time"
 
 	"inventory/internal/storage"
 	"inventory/pkg"
@@ -48,7 +49,10 @@ func (c *ProductController) createProductHandler(w http.ResponseWriter, r *http.
 		return err
 	}
 
-	resp, err := c.service.CreateProduct(context.Background(), &product)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+	defer cancel()
+
+	resp, err := c.service.CreateProduct(ctx, &product)
 	if err != nil {
 		return err
 	}
@@ -59,7 +63,10 @@ func (c *ProductController) createProductHandler(w http.ResponseWriter, r *http.
 func (c *ProductController) getProductById(w http.ResponseWriter, r *http.Request) error {
 	id := mux.Vars(r)["id"]
 
-	resp, err := c.service.GetProductById(context.Background(), id)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+	defer cancel()
+
+	resp, err := c.service.GetProductById(ctx, id)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -69,7 +76,10 @@ func (c *ProductController) getProductById(w http.ResponseWriter, r *http.Reques
 }
 
 func (c *ProductController) getAllProductHandler(w http.ResponseWriter, r *http.Request) error {
-	resp, err := c.service.GetAllProducts(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+	defer cancel()
+
+	resp, err := c.service.GetAllProducts(ctx)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -90,7 +100,11 @@ func (c *ProductController) updateProductHandler(w http.ResponseWriter, r *http.
 		return err
 	}
 	product.Id = mux.Vars(r)["id"]
-	resp, err := c.service.UpdateProduct(context.Background(), &product)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+	defer cancel()
+
+	resp, err := c.service.UpdateProduct(ctx, &product)
 	if err != nil {
 		return err
 	}

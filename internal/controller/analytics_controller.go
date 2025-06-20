@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"time"
 
 	"inventory/internal/storage"
 	"inventory/pkg"
@@ -36,7 +37,11 @@ func (c *AnalyticsController) getStockHandler(w http.ResponseWriter, r *http.Req
 	if stock == "" {
 		stock = "3"
 	}
-	resp, err := c.service.FindMinStock(context.Background(), stock)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+	defer cancel()
+
+	resp, err := c.service.FindMinStock(ctx, stock)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -50,8 +55,11 @@ func (c *AnalyticsController) searchFilterHandler(w http.ResponseWriter, r *http
 	if err := json.NewDecoder(r.Body).Decode(productFilter); err != nil && err != io.EOF {
 		return err
 	}
+	defer r.Body.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+	defer cancel()
 
-	resp, err := c.service.GetProductBySearchFilter(context.Background(), productFilter)
+	resp, err := c.service.GetProductBySearchFilter(ctx, productFilter)
 	if err != nil {
 		log.Println(err)
 		return err
