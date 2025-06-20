@@ -15,7 +15,6 @@ import (
 type Service interface {
 	CreateProduct(ctx context.Context, product *pb.Product) (*pb.Product, error)
 	GetProductById(ctx context.Context, productId string) (*pb.Product, error)
-	GetAllProducts(ctx context.Context) ([]*pb.Product, error)
 	UpdateProduct(ctx context.Context, product *pb.Product) (*pb.Product, error)
 	DeleteProduct(ctx context.Context, productId string) error
 
@@ -46,15 +45,6 @@ func (s *productService) CreateProduct(ctx context.Context, product *pb.Product)
 
 func (s *productService) GetProductById(ctx context.Context, productId string) (*pb.Product, error) {
 	resp, err := s.repo.Product(ctx, productId)
-	if err != nil {
-		return nil, returnServiceString(err)
-	}
-
-	return resp, nil
-}
-
-func (s *productService) GetAllProducts(ctx context.Context) ([]*pb.Product, error) {
-	resp, err := s.repo.Products(ctx)
 	if err != nil {
 		return nil, returnServiceString(err)
 	}

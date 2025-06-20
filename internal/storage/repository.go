@@ -16,7 +16,6 @@ import (
 type Repository interface {
 	Upsert(ctx context.Context, product *pb.Product, productId string) error
 	Product(ctx context.Context, productId string) (*pb.Product, error)
-	Products(ctx context.Context) ([]*pb.Product, error)
 	Delete(ctx context.Context, productId string) error
 
 	// Analytics
@@ -135,16 +134,6 @@ func (r *inventoryRepository) Product(ctx context.Context, productId string) (*p
 
 	document.Source.Id = document.Id
 	return &document.Source, nil
-}
-
-func (r *inventoryRepository) Products(ctx context.Context) ([]*pb.Product, error) {
-	stringQuery := `{
-		"query": {
-			"match_all": {}
-		}
-	}`
-
-	return r.searchResult(ctx, stringQuery)
 }
 
 // Analytics

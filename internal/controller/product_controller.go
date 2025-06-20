@@ -34,7 +34,6 @@ func (c *ProductController) StartProductControoler() {
 	c.router.HandleFunc("/{id}", pkg.HandleAdapter(c.deleteProduct)).Methods("DELETE")
 
 	c.router.HandleFunc("", pkg.HandleAdapter(c.createProductHandler)).Methods("POST")
-	c.router.HandleFunc("", pkg.HandleAdapter(c.getAllProductHandler)).Methods("GET")
 }
 
 func (c *ProductController) createProductHandler(w http.ResponseWriter, r *http.Request) error {
@@ -67,19 +66,6 @@ func (c *ProductController) getProductById(w http.ResponseWriter, r *http.Reques
 	defer cancel()
 
 	resp, err := c.service.GetProductById(ctx, id)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-
-	return pkg.WriteJson(w, 200, &resp)
-}
-
-func (c *ProductController) getAllProductHandler(w http.ResponseWriter, r *http.Request) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
-	defer cancel()
-
-	resp, err := c.service.GetAllProducts(ctx)
 	if err != nil {
 		log.Println(err)
 		return err
