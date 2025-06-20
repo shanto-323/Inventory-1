@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 
+	"inventory/pkg"
 	"inventory/pkg/pb"
 
 	"github.com/elastic/go-elasticsearch/v9"
@@ -20,6 +22,7 @@ type Repository interface {
 
 	// Analytics
 	MinStock(ctx context.Context, level int) ([]*pb.Product, error)
+	SearchWithFilter(ctx context.Context, filterModel *pkg.FilterModel) ([]*pb.Product, error)
 }
 
 type inventoryRepository struct {
@@ -62,11 +65,13 @@ const (
 )
 
 func (r *inventoryRepository) Upsert(ctx context.Context, product *pb.Product, productId string) error {
+	productTitle := fmt.Sprintf("%s %s %s\n", product.Brand, product.Model, product.Name)
 	doc := map[string]interface{}{
 		"doc": map[string]interface{}{
 			"type":       product.GetType(),
 			"brand":      product.GetBrand(),
 			"name":       product.GetName(),
+			"title":      productTitle,
 			"model":      product.GetModel(),
 			"stock":      product.GetStock(),
 			"specs":      product.GetSpecs(),
@@ -150,11 +155,29 @@ func (r *inventoryRepository) MinStock(ctx context.Context, level int) ([]*pb.Pr
 		"query": {
 			"range": {
 				"stock": {
-					"lte" : %d
+					"lte": %d
 				}
 			}
 		}
 	}`, level)
+
+	return r.searchResult(ctx, stringQuery)
+}
+
+func (r *inventoryRepository) SearchWithFilter(ctx context.Context, filterModel *pkg.FilterModel) ([]*pb.Product, error) {
+	termQuery := r.addFilter(filterModel)
+	stringQuery := fmt.Sprintf(`{
+		"query": {
+			"bool": {
+				"must": [
+					%s
+				]
+			}
+		}
+	}`, termQuery)
+
+	// DEBUG
+	log.Println(stringQuery, "\n", termQuery)
 
 	return r.searchResult(ctx, stringQuery)
 }
@@ -185,6 +208,89 @@ func (r *inventoryRepository) searchResult(ctx context.Context, query string) ([
 	}
 
 	return products, nil
+}
+
+func (r *inventoryRepository) addFilter(filterModel *pkg.FilterModel) string {
+	filterString := ""
+
+	if filterModel.SearchString != nil {
+		filterString += fmt.Sprintf(`{
+			"match": {
+				"title": "%s"
+				"fuzziness": "auto"
+			}
+		},`, *filterModel.SearchString)
+	} else {
+		filterString += `{
+			"match_all": {}
+		}`
+	}
+
+	if filterModel.ProductType != nil {
+		filterString += fmt.Sprintf(`{
+			"term": {
+				"type": "%s"
+			}
+		},`, *filterModel.ProductType)
+	}
+
+	if filterModel.ProductBrand != nil {
+		filterString += fmt.Sprintf(`{
+			"term": {
+				"brand": "%s"
+			}
+		},`, *filterModel.ProductBrand)
+	}
+
+	if filterModel.ProductName != nil {
+		filterString += fmt.Sprintf(`{
+			"term": {
+				"name": "%s"
+			}
+		},`, *filterModel.ProductName)
+	}
+
+	if filterModel.ProductModel != nil {
+		filterString += fmt.Sprintf(`{
+			"term": {
+				"model": "%s"
+			}
+		},`, *filterModel.ProductModel)
+	}
+
+	if filterModel.Supplier != nil {
+		filterString += fmt.Sprintf(`{
+			"term": {
+				"supplier": "%s"
+			}
+		},`, *filterModel.Supplier)
+	}
+
+	if filterModel.MinStock != nil {
+		filterString += fmt.Sprintf(`{
+			"range": {
+				"stock": {
+					"gte": %d
+				}
+			}
+		},`, *filterModel.MinStock)
+	}
+
+	if filterModel.MaxStock != nil {
+		filterString += fmt.Sprintf(`{
+			"range": {
+				"stock": {
+					"lte": %d
+				}
+			}
+		},`, *filterModel.MaxStock)
+	}
+
+	if len(filterString) > 0 && filterString[len(filterString)-1] == ',' {
+		filterString = filterString[:len(filterString)-1]
+	}
+
+	return filterString
 }
 
 func returnString(m any) error {

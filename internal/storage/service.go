@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"inventory/pkg"
 	"inventory/pkg/pb"
 
 	"github.com/google/uuid"
@@ -20,6 +21,7 @@ type Service interface {
 
 	// Analytics
 	FindMinStock(ctx context.Context, levelString string) ([]*pb.Product, error)
+	GetProductBySearchFilter(ctx context.Context, filterModel *pkg.FilterModel) ([]*pb.Product, error)
 }
 
 type productService struct {
@@ -78,12 +80,22 @@ func (s *productService) DeleteProduct(ctx context.Context, productId string) er
 	return s.repo.Delete(ctx, productId)
 }
 
+// Analytics
 func (s *productService) FindMinStock(ctx context.Context, levelString string) ([]*pb.Product, error) {
 	level, err := strconv.ParseInt(levelString, 10, 64)
 	if err != nil {
 		return nil, returnServiceString(err)
 	}
 	return s.repo.MinStock(ctx, int(level))
+}
+
+func (s *productService) GetProductBySearchFilter(ctx context.Context, filterModel *pkg.FilterModel) ([]*pb.Product, error) {
+	resp, err := s.repo.SearchWithFilter(ctx, filterModel)
+	if err != nil {
+		return nil, returnServiceString(err)
+	}
+
+	return resp, nil
 }
 
 func mutationHelper(dbData *pb.Product, product *pb.Product) {
