@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 
 	"inventory/pkg"
@@ -65,13 +64,12 @@ const (
 )
 
 func (r *inventoryRepository) Upsert(ctx context.Context, product *pb.Product, productId string) error {
-	productTitle := fmt.Sprintf("%s %s %s\n", product.Brand, product.Model, product.Name)
+	productTitle := fmt.Sprintf("%s %s %s", product.Brand, product.Name, product.Model)
 	doc := map[string]interface{}{
 		"doc": map[string]interface{}{
 			"type":       product.GetType(),
 			"brand":      product.GetBrand(),
-			"name":       product.GetName(),
-			"title":      productTitle,
+			"name":       productTitle,
 			"model":      product.GetModel(),
 			"stock":      product.GetStock(),
 			"specs":      product.GetSpecs(),
@@ -176,9 +174,6 @@ func (r *inventoryRepository) SearchWithFilter(ctx context.Context, filterModel 
 		}
 	}`, termQuery)
 
-	// DEBUG
-	log.Println(stringQuery, "\n", termQuery)
-
 	return r.searchResult(ctx, stringQuery)
 }
 
@@ -216,20 +211,22 @@ func (r *inventoryRepository) addFilter(filterModel *pkg.FilterModel) string {
 	if filterModel.SearchString != nil {
 		filterString += fmt.Sprintf(`{
 			"match": {
-				"title": "%s"
-				"fuzziness": "auto"
+				"name":{
+					"query": "%s",
+					"fuzziness": "auto"
+				}
 			}
 		},`, *filterModel.SearchString)
 	} else {
 		filterString += `{
 			"match_all": {}
-		}`
+		},`
 	}
 
 	if filterModel.ProductType != nil {
 		filterString += fmt.Sprintf(`{
 			"term": {
-				"type": "%s"
+				"type.keyword": "%s"
 			}
 		},`, *filterModel.ProductType)
 	}
@@ -237,23 +234,15 @@ func (r *inventoryRepository) addFilter(filterModel *pkg.FilterModel) string {
 	if filterModel.ProductBrand != nil {
 		filterString += fmt.Sprintf(`{
 			"term": {
-				"brand": "%s"
+				"brand.keyword": "%s"
 			}
 		},`, *filterModel.ProductBrand)
-	}
-
-	if filterModel.ProductName != nil {
-		filterString += fmt.Sprintf(`{
-			"term": {
-				"name": "%s"
-			}
-		},`, *filterModel.ProductName)
 	}
 
 	if filterModel.ProductModel != nil {
 		filterString += fmt.Sprintf(`{
 			"term": {
-				"model": "%s"
+				"model.keyword": "%s"
 			}
 		},`, *filterModel.ProductModel)
 	}
@@ -261,7 +250,7 @@ func (r *inventoryRepository) addFilter(filterModel *pkg.FilterModel) string {
 	if filterModel.Supplier != nil {
 		filterString += fmt.Sprintf(`{
 			"term": {
-				"supplier": "%s"
+				"supplier.keyword": "%s"
 			}
 		},`, *filterModel.Supplier)
 	}

@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 
@@ -45,10 +46,11 @@ func (c *AnalyticsController) getStockHandler(w http.ResponseWriter, r *http.Req
 }
 
 func (c *AnalyticsController) searchFilterHandler(w http.ResponseWriter, r *http.Request) error {
-	var productFilter *pkg.FilterModel
-	if err := json.NewDecoder(r.Body).Decode(productFilter); err != nil {
+	productFilter := &pkg.FilterModel{}
+	if err := json.NewDecoder(r.Body).Decode(productFilter); err != nil && err != io.EOF {
 		return err
 	}
+
 	resp, err := c.service.GetProductBySearchFilter(context.Background(), productFilter)
 	if err != nil {
 		log.Println(err)
